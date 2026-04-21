@@ -126,6 +126,32 @@ export default function VideoLibrary({ onVideoSelect, refreshKey }: VideoLibrary
     }
   }
 
+  const handleProcess = async (video: VideoMetadata) => {
+    try {
+      await api.post(`/api/v1/videos/${video.video_id}/process`)
+      // Refresh the list to show updated status
+      fetchVideos(page)
+    } catch (err: any) {
+      const message = err.response?.data?.detail || 'Failed to start processing'
+      alert(`Failed to process "${video.filename}": ${message}`)
+    }
+  }
+
+  const handleCancel = async (video: VideoMetadata) => {
+    const confirmed = window.confirm(
+      `Cancel processing for "${video.filename}"?`
+    )
+    if (!confirmed) return
+
+    try {
+      await api.post(`/api/v1/videos/${video.video_id}/cancel`)
+      // Refresh the list to show updated status
+      fetchVideos(page)
+    } catch {
+      alert(`Failed to cancel processing for "${video.filename}". Please try again.`)
+    }
+  }
+
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
 
   // ── Render states ────────────────────────────────────────────────────────────
@@ -223,14 +249,36 @@ export default function VideoLibrary({ onVideoSelect, refreshKey }: VideoLibrary
                     className="whitespace-nowrap px-4 py-3 text-right"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <button
-                      onClick={() => handleDelete(video)}
-                      disabled={deletingId === video.video_id}
-                      aria-label={`Delete ${video.filename}`}
-                      className="rounded-md px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
-                    >
-                      {deletingId === video.video_id ? 'Deleting…' : 'Delete'}
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      {(video.status === 'pending' || video.status === 'failed' || video.status === 'cancelled') && (
+                        <button
+                          onClick={() => handleProcess(video)}
+                          disabled={deletingId === video.video_id}
+                          aria-label={`Process ${video.filename}`}
+                          className="rounded-md px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50 dark:text-blue-400 dark:hover:bg-blue-950"
+                        >
+                          Process
+                        </button>
+                      )}
+                      {video.status === 'processing' && (
+                        <button
+                          onClick={() => handleCancel(video)}
+                          disabled={deletingId === video.video_id}
+                          aria-label={`Cancel ${video.filename}`}
+                          className="rounded-md px-2.5 py-1.5 text-xs font-medium text-yellow-600 hover:bg-yellow-50 disabled:opacity-50 dark:text-yellow-400 dark:hover:bg-yellow-950"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(video)}
+                        disabled={deletingId === video.video_id}
+                        aria-label={`Delete ${video.filename}`}
+                        className="rounded-md px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
+                      >
+                        {deletingId === video.video_id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
