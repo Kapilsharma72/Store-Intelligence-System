@@ -164,11 +164,12 @@ def validate_video_metadata(filepath: str) -> dict:
         filepath: Absolute or relative path to the video file on disk.
 
     Returns:
-        Metadata dict with the fields listed above.
+        Metadata dict with the fields listed above. If ffprobe is not
+        available, returns default/minimal metadata values.
 
     Raises:
-        HTTPException(422): If ``ffprobe`` is not available, the file
-            cannot be probed, or required metadata fields are missing.
+        HTTPException(422): If the file cannot be probed or required
+            metadata fields are missing (only when ffprobe is available).
     """
     cmd = [
         "ffprobe",
@@ -187,15 +188,19 @@ def validate_video_metadata(filepath: str) -> dict:
             timeout=60,
         )
     except FileNotFoundError:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "ffprobe not available. "
-                         "Install FFmpeg to enable video metadata validation.",
-                "field": "ffprobe",
-                "value": None,
-            },
+        # ffprobe not available - return default metadata
+        logger.warning(
+            "ffprobe_not_available",
+            message="FFmpeg not installed. Returning default metadata. "
+                    "Install FFmpeg for full video validation.",
         )
+        return {
+            "duration": 0.0,
+            "width": 1920,
+            "height": 1080,
+            "codec": "unknown",
+            "frame_rate": 0.0,
+        }
     except subprocess.TimeoutExpired:
         raise HTTPException(
             status_code=422,
@@ -429,10 +434,10 @@ def validate_video(file_content: bytes, temp_filepath: str) -> dict:
     Checks are performed in this order:
     1. Magic bytes (format detection)
     2. File size
-    3. ffprobe metadata extraction
-    4. Duration
-    5. Resolution
-    6. Codec
+    3. ffprobe metadata extraction (optional - skipped if FFmpeg not installed)
+    4. Duration (skipped if ffprobe unavailable)
+    5. Resolution (skipped if ffprobe unavailable)
+    6. Codec (skipped if ffprobe unavailable)
 
     The file is **not** stored if any check fails — the caller is
     responsible for writing *file_content* to *temp_filepath* before
@@ -459,14 +464,23 @@ def validate_video(file_content: bytes, temp_filepath: str) -> dict:
     # 3. ffprobe metadata
     metadata = validate_video_metadata(temp_filepath)
 
-    # 4. Duration
-    validate_duration(metadata["duration"])
+    # Only validate duration, resolution, and codec if ffprobe was available
+    # (indicated by codec != "unknown")
+    if metadata["codec"] != "unknown":
+        # 4. Duration
+        validate_duration(metadata["duration"])
 
-    # 5. Resolution
-    validate_resolution(metadata["width"], metadata["height"])
+        # 5. Resolution
+        validate_resolution(metadata["width"], metadata["height"])
 
-    # 6. Codec
-    validate_codec(metadata["codec"])
+        # 6. Codec
+        validate_codec(metadata["codec"])
+    else:
+        logger.info(
+            "video_validation_skipped",
+            message="Skipping duration/resolution/codec validation "
+                    "(FFmpeg not installed)",
+        )
 
     metadata["format"] = detected_format
     return metadata
