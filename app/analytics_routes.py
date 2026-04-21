@@ -247,7 +247,7 @@ class DwellDistributionResponse(BaseModel):
 async def get_journey(
     video_id: str,
     response: Response,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> JourneyResponse:
     """
@@ -347,7 +347,7 @@ async def get_journey(
 async def get_timeseries(
     video_id: str,
     response: Response,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> TimeseriesResponse:
     """
@@ -498,7 +498,7 @@ async def get_comparison(
     video_id: str,
     response: Response,
     comparison_video_ids: List[str] = Query(default=[]),
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> ComparisonResponse:
     """
@@ -557,7 +557,7 @@ async def get_comparison(
 async def get_staff_analysis(
     video_id: str,
     response: Response,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> StaffAnalysisResponse:
     """
@@ -617,7 +617,7 @@ async def get_staff_analysis(
 async def get_peak_hours(
     video_id: str,
     response: Response,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> PeakHoursResponse:
     """
@@ -705,7 +705,7 @@ async def get_peak_hours(
 async def get_zone_ranking(
     video_id: str,
     response: Response,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> ZoneRankingResponse:
     """
@@ -797,7 +797,7 @@ async def get_zone_ranking(
 async def get_queue_analysis(
     video_id: str,
     response: Response,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> QueueAnalysisResponse:
     """
@@ -905,7 +905,7 @@ async def get_queue_analysis(
 async def get_dwell_distribution(
     video_id: str,
     response: Response,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> DwellDistributionResponse:
     """

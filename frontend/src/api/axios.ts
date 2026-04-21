@@ -4,15 +4,6 @@ const api = axios.create({
   baseURL: '/',
 })
 
-// Request interceptor: attach Authorization header if token exists
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token')
-  if (token) {
-    config.headers['Authorization'] = `Bearer ${token}`
-  }
-  return config
-})
-
 // Response interceptor: retry once on 5xx after 2-second delay
 api.interceptors.response.use(
   (response) => response,

@@ -146,8 +146,15 @@ class ProcessResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _check_ownership(video: Video, current_user: UserContext) -> None:
-    """Raise HTTP 403 if the current user does not own the video and is not admin."""
+def _check_ownership(video: Video, current_user: Optional[UserContext]) -> None:
+    """Raise HTTP 403 if the current user does not own the video and is not admin.
+    
+    If current_user is None (no authentication), access is allowed.
+    """
+    if current_user is None:
+        # No authentication - allow access
+        return
+    
     if video.uploaded_by != current_user.username and current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -201,7 +208,7 @@ router = APIRouter(prefix="/api/v1/videos", tags=["videos"])
 async def upload_video(
     file: UploadFile = File(...),
     store_config: Optional[str] = Form(None),
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
     _rate_limit: None = Depends(check_upload_rate_limit),
 ) -> VideoResponse:
@@ -235,6 +242,9 @@ async def upload_video(
     filepath = await storage.save_video(file_content, video_id, original_filename)
 
     resolution = f"{metadata['width']}x{metadata['height']}"
+    
+    # Get username for tracking (use "anonymous" if no auth)
+    username = current_user.username if current_user else "anonymous"
 
     # Insert DB row
     now = datetime.now(timezone.utc)
@@ -249,7 +259,7 @@ async def upload_video(
         store_config=store_config,
         status="pending",
         upload_timestamp=now,
-        uploaded_by=current_user.username,
+        uploaded_by=username,
     )
     db.add(video)
     db.commit()
@@ -259,7 +269,7 @@ async def upload_video(
         "video_uploaded",
         video_id=video_id,
         filename=original_filename,
-        uploaded_by=current_user.username,
+        uploaded_by=username,
         file_size_bytes=len(file_content),
     )
 
@@ -285,13 +295,14 @@ async def upload_video(
 def list_videos(
     page: int = 1,
     page_size: int = 20,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> VideoListResponse:
     """
     Return a paginated list of videos owned by the current user.
 
-    Admins see all videos. Each item includes the latest processing job status.
+    Admins see all videos. If no authentication, all videos are shown.
+    Each item includes the latest processing job status.
 
     Requirements: 1.5, 3.2, 17.4
     """
@@ -301,7 +312,8 @@ def list_videos(
         page_size = 20
 
     query = db.query(Video)
-    if current_user.role != "admin":
+    # Filter by user only if authenticated and not admin
+    if current_user and current_user.role != "admin":
         query = query.filter(Video.uploaded_by == current_user.username)
 
     total = query.count()
@@ -338,7 +350,7 @@ def list_videos(
 @router.get("/{video_id}", response_model=VideoDetailResponse)
 def get_video(
     video_id: str,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> VideoDetailResponse:
     """
@@ -382,7 +394,7 @@ def get_video(
 @router.delete("/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_video(
     video_id: str,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> None:
     """
@@ -432,7 +444,7 @@ async def delete_video(
         "video_deleted",
         video_id=video_id,
         filename=video.filename,
-        deleted_by=current_user.username,
+        deleted_by=current_user.username if current_user else "anonymous",
         events_deleted=events_deleted,
         jobs_deleted=jobs_deleted,
     )
@@ -446,7 +458,7 @@ async def delete_video(
 @router.get("/{video_id}/status", response_model=VideoStatusResponse)
 def get_video_status(
     video_id: str,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> VideoStatusResponse:
     """
@@ -479,7 +491,7 @@ def get_video_status(
 @router.post("/{video_id}/process", response_model=ProcessResponse, status_code=status.HTTP_202_ACCEPTED)
 async def process_video(
     video_id: str,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> ProcessResponse:
     """
@@ -518,7 +530,7 @@ async def process_video(
         logger.info(
             "video_reprocess_after_cancel",
             video_id=video_id,
-            requested_by=current_user.username,
+            requested_by=current_user.username if current_user else "anonymous",
         )
 
     # Enqueue the job — raises HTTP 503 if queue is full
@@ -532,7 +544,7 @@ async def process_video(
         "video_process_enqueued",
         video_id=video_id,
         job_id=job_id,
-        requested_by=current_user.username,
+        requested_by=current_user.username if current_user else "anonymous",
     )
 
     return ProcessResponse(job_id=job_id, video_id=video_id, status="pending")
@@ -546,7 +558,7 @@ async def process_video(
 @router.post("/{video_id}/cancel")
 async def cancel_video(
     video_id: str,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> dict:
     """
@@ -573,7 +585,7 @@ async def cancel_video(
     logger.info(
         "video_cancel_requested",
         video_id=video_id,
-        requested_by=current_user.username,
+        requested_by=current_user.username if current_user else "anonymous",
     )
 
     return {"video_id": video_id, "status": "cancelled"}

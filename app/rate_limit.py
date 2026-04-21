@@ -15,7 +15,7 @@ Requirements: 18.1, 18.2, 18.3, 18.5
 
 import time
 import uuid
-from typing import Annotated
+from typing import Annotated, Optional
 
 import structlog
 from fastapi import Depends, HTTPException, status
@@ -41,20 +41,21 @@ UPLOAD_RATE_WINDOW_SECONDS = 3600  # 1 hour
 
 
 async def check_upload_rate_limit(
-    current_user: Annotated[UserContext, Depends(get_current_user)],
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)],
     redis_client: Annotated[Redis, Depends(get_redis_dep)],
 ) -> None:
     """
     FastAPI dependency that enforces the sliding-window upload rate limit.
 
+    - If no authentication, rate limiting is skipped.
     - Admin users bypass the limit entirely.
     - On Redis failure the request is allowed through (fail open).
     - Raises HTTP 429 with Retry-After header when the limit is exceeded.
 
     Requirements: 18.1, 18.2, 18.3, 18.5
     """
-    # Admins are exempt (Requirement 18.5)
-    if current_user.role == "admin":
+    # No authentication or admins are exempt
+    if current_user is None or current_user.role == "admin":
         return
 
     key = f"rate_limit:upload:{current_user.username}"
@@ -102,6 +103,6 @@ async def check_upload_rate_limit(
         # Fail open: log a warning and allow the request through
         logger.warning(
             "rate_limit_redis_unavailable",
-            username=current_user.username,
+            username=current_user.username if current_user else "anonymous",
             error=str(exc),
         )

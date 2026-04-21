@@ -579,7 +579,7 @@ def _generate_excel(
 @router.post("/{video_id}/export/pdf")
 async def export_pdf(
     video_id: str,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """
@@ -617,7 +617,7 @@ async def export_pdf(
 @router.post("/{video_id}/export/excel")
 async def export_excel(
     video_id: str,
-    current_user: Annotated[UserContext, Depends(get_current_user)] = None,
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """

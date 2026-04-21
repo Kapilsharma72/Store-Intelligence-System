@@ -4,12 +4,12 @@ JWT authentication middleware and endpoints.
 Provides:
   - POST /api/v1/auth/login   — exchange credentials for a JWT
   - POST /api/v1/auth/refresh — exchange a valid JWT for a new one with extended expiry
-  - get_current_user          — FastAPI dependency that validates Bearer tokens
+  - get_current_user          — FastAPI dependency that validates Bearer tokens (OPTIONAL)
 """
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -35,9 +35,9 @@ _DEMO_USERS: dict[str, dict] = {
 }
 
 # ---------------------------------------------------------------------------
-# OAuth2 scheme — expects "Authorization: Bearer <token>"
+# OAuth2 scheme — expects "Authorization: Bearer <token>" (auto_error=False makes it optional)
 # ---------------------------------------------------------------------------
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 # ---------------------------------------------------------------------------
 # Pydantic schemas
@@ -94,16 +94,21 @@ def _decode_token(token: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# FastAPI dependency
+# FastAPI dependency - NOW OPTIONAL (returns None if no token provided)
 # ---------------------------------------------------------------------------
 
 
-def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> UserContext:
+def get_current_user(token: Annotated[Optional[str], Depends(oauth2_scheme)] = None) -> Optional[UserContext]:
     """
     Validate the Bearer token and return the authenticated user context.
-
-    Raises HTTP 401 if the token is missing, invalid, or expired.
+    
+    Returns None if no token is provided (authentication is optional).
+    Raises HTTP 401 only if a token is provided but is invalid or expired.
     """
+    if token is None:
+        # No token provided - authentication is optional
+        return None
+    
     payload = _decode_token(token)
 
     username: str | None = payload.get("sub")
@@ -148,13 +153,20 @@ def login(credentials: LoginRequest) -> TokenResponse:
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh_token(
-    current_user: Annotated[UserContext, Depends(get_current_user)],
+    current_user: Annotated[Optional[UserContext], Depends(get_current_user)],
 ) -> TokenResponse:
     """
     Accept a valid Bearer token and return a new token with extended expiration.
 
     Requirements: 17.2
     """
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     token = _create_access_token(
         username=current_user.username,
         role=current_user.role,
