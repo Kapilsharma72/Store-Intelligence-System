@@ -1,7 +1,15 @@
+import { useState } from 'react'
 import VideoLibrary from '../components/VideoLibrary'
 import UploadZone from '../components/UploadZone'
 
 export default function VideosPage() {
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const handleUploadComplete = () => {
+    // Increment refresh key to trigger VideoLibrary reload
+    setRefreshKey((prev) => prev + 1)
+  }
+
   return (
     <>
       <div className="col-span-full">
@@ -13,12 +21,12 @@ export default function VideosPage() {
 
       {/* Upload Section */}
       <div className="col-span-full">
-        <UploadZone />
+        <UploadZone onUploadComplete={handleUploadComplete} />
       </div>
 
       {/* Video Library */}
       <div className="col-span-full mt-6">
-        <VideoLibrary />
+        <VideoLibrary refreshKey={refreshKey} />
       </div>
     </>
   )
