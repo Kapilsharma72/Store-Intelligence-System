@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import { ThemeProvider } from './components/ThemeProvider'
 import Layout from './components/Layout'
+import VideosPage from './pages/VideosPage'
+import AnalyticsListPage from './pages/AnalyticsListPage'
 import AnalyticsDashboard from './pages/AnalyticsDashboard'
 import ComparePage from './pages/ComparePage'
 
@@ -106,13 +108,13 @@ export default function App() {
           <Route
             path="/videos"
             element={
-              <Layout><div className="col-span-full"><h1 className="text-2xl font-bold">Videos</h1></div></Layout>
+              <Layout><VideosPage /></Layout>
             }
           />
           <Route
             path="/analytics"
             element={
-              <Layout><div className="col-span-full"><h1 className="text-2xl font-bold">Analytics</h1></div></Layout>
+              <Layout><AnalyticsListPage /></Layout>
             }
           />
           <Route
@@ -124,7 +126,7 @@ export default function App() {
           <Route
             path="/compare"
             element={
-              <Layout><div className="col-span-full"><ComparePage /></div></Layout>
+              <Layout><ComparePage /></Layout>
             }
           />
         </Routes>
