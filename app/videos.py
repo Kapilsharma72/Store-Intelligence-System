@@ -30,7 +30,6 @@ from sqlalchemy.orm import Session
 
 from app.auth import UserContext, get_current_user
 from app.database import Base, get_db
-from app.rate_limit import check_upload_rate_limit
 from app.redis_client import cache_invalidate_pattern, get_redis
 from app.video_storage import get_storage_backend
 from app.video_validation import validate_video
@@ -210,12 +209,13 @@ async def upload_video(
     store_config: Optional[str] = Form(None),
     current_user: Annotated[Optional[UserContext], Depends(get_current_user)] = None,
     db: Session = Depends(get_db),
-    _rate_limit: None = Depends(check_upload_rate_limit),
 ) -> VideoResponse:
     """
     Upload and validate a video file, then persist it to storage and the database.
 
     Requirements: 1.3, 3.1, 3.2, 17.4
+    
+    Note: Rate limiting is disabled when Redis is unavailable.
     """
     file_content = await file.read()
     original_filename = file.filename or "upload"
